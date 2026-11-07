@@ -45,7 +45,6 @@
           sounds.gameover.volume = 0.5;
           audioUnlocked = true;
         }).catch(() => {
-          // Fallback через AudioContext
           try {
             const AC = window.AudioContext || window.webkitAudioContext;
             if (AC) {
@@ -91,9 +90,7 @@
       this.livesEl = document.getElementById(livesId);
 
       this.lives = 3;
-      // isImmortal влияет только на ИИ (агрессивная очистка),
-      // но НЕ блокирует списание жизней
-      this.isImmortal = false;
+      this.isImmortal = false; // Влияет только на ИИ, не блокирует смерть
       this.isGameOver = false;
 
       this.board = [];
@@ -149,9 +146,6 @@
     spawnPiece() {
       if (this.freezeTimer > 0 || this.isGameOver) return;
 
-      // Гарантируем место для новой фигуры
-      this.ensureSpawnSpace();
-
       const type = TYPES[(Math.random() * TYPES.length) | 0];
       this.current = {
         type,
@@ -160,32 +154,13 @@
         y: 0
       };
 
-      if (this.collides(this.board, this.current.matrix, this.current.x, this.current.y)) {
+      // Честная проверка overflow: либо фигура не влезает, 
+      // либо верхние 4 строки забиты блоками
+      if (this.collides(this.board, this.current.matrix, this.current.x, this.current.y) ||
+          this.topRowsOccupied(4)) {
         this.handleOverflow();
       } else {
         this.currentPlan = this.findBestMove(this.board, this.current);
-      }
-    }
-
-    // Обнуляет верхние занятые строки, пока не освободятся needFree строк.
-    // Не сдвигает доску — именно стирает блоки сверху.
-    ensureSpawnSpace() {
-      const needFree = 4;
-      let guard = 0;
-      while (this.topRowsOccupied(needFree) && guard < ROWS) {
-        let clearedOne = false;
-        // Ищем самую нижнюю занятую строку в верхних needFree и обнуляем её
-        for (let r = needFree - 1; r >= 0; r--) {
-          for (let c = 0; c < COLS; c++) {
-            if (this.board[r][c]) {
-              this.board[r][c] = null;
-              clearedOne = true;
-            }
-          }
-          if (clearedOne) break;
-        }
-        if (!clearedOne) break;
-        guard++;
       }
     }
 
@@ -206,7 +181,7 @@
 
       if (this.isGameOver) return;
 
-      // Списываем жизнь (всегда)
+      // Списываем жизнь
       this.lives--;
       if (this.lives < 0) this.lives = 0;
       this.updateLivesUI();
@@ -218,14 +193,19 @@
         return;
       }
 
-      // Штрафная очистка: убираем 4 нижние линии (сдвиг вниз)
+      // Штрафная очистка: убираем 4 нижние линии
       for (let i = 0; i < 4; i++) {
         this.board.pop();
         this.board.unshift(Array(COLS).fill(null));
       }
 
-      // Гарантируем место для следующей фигуры (обнуляем верх)
-      this.ensureSpawnSpace();
+      // Принудительно освобождаем место для следующей фигуры
+      // (полностью обнуляем верхние 4 строки, чтобы не было бага с зависанием)
+      for (let r = 0; r < 4 && r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          this.board[r][c] = null;
+        }
+      }
 
       this.score += 100;
       this.updateUI();
