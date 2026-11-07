@@ -38,19 +38,7 @@
         p.then(() => {
           sounds.drop.volume = 0.5; sounds.clear.volume = 0.5; sounds.gameover.volume = 0.5;
           audioUnlocked = true;
-        }).catch(() => {
-          // Fallback для некоторых браузеров
-          try {
-            const AC = window.AudioContext || window.webkitAudioContext;
-            if (AC) {
-              const ctx = new AC();
-              if (ctx.state === 'suspended') ctx.resume().then(() => {
-                sounds.drop.volume = 0.5; sounds.clear.volume = 0.5; sounds.gameover.volume = 0.5;
-                audioUnlocked = true;
-              }).catch(() => {});
-            }
-          } catch (e) {}
-        });
+        }).catch(() => {});
       }
     } catch (e) {}
     document.removeEventListener('click', unlockAudio);
@@ -77,7 +65,7 @@
       this.canvas = document.getElementById(canvasId);
       this.ctx = this.canvas.getContext("2d");
       
-      // Задаем внутреннее разрешение холста для четкости (пропорция 1 : 2.2)
+      // Разрешение холста (пропорция 1 : 2.2)
       this.canvas.width = 260;
       this.canvas.height = 572; 
 
@@ -87,7 +75,6 @@
       
       this.lives = 3;
       this.isImmortal = false;
-      this.isGameOver = false;
       
       this.board = [];
       this.current = null;
@@ -127,7 +114,6 @@
       this.linesCleared = 0;
       this.lives = 3;
       this.isImmortal = false;
-      this.isGameOver = false;
       this.dropTimer = 0;
       this.playDelay = 0;
       this.dropInterval = 120;
@@ -140,16 +126,18 @@
     }
 
     spawnPiece() {
-      if (this.freezeTimer > 0 || this.isGameOver) return;
+      // Если идет заморозка после ошибки, мы просто ждем
+      if (this.freezeTimer > 0) return;
 
       const type = TYPES[(Math.random() * TYPES.length) | 0];
       this.current = {
         type,
         matrix: SHAPES[type].map(r => r.slice()),
         x: Math.floor((COLS - SHAPES[type][0].length) / 2),
-        y: -1 // Спавн над полем
+        y: 0 // Спавним на 0, чтобы избежать визуальных багов
       };
 
+      // Проверка на переполнение (Game Over)
       if (this.collides(this.board, this.current.matrix, this.current.x, this.current.y)) {
         this.handleOverflow();
       } else {
@@ -160,26 +148,22 @@
     handleOverflow() {
       playSound("gameover");
       
+      // 1. Убираем фигуру с экрана
       this.current = null; 
       this.currentPlan = null;
 
+      // 2. Списываем жизнь
       if (!this.isImmortal) {
         this.lives--;
         this.updateLivesUI();
         
+        // Включаем бессмертие при 1 жизни
         if (this.lives === 1) {
           this.isImmortal = true;
         }
-        if (this.lives <= 0) {
-          this.lives = 0;
-          this.isGameOver = true;
-          this.updateLivesUI();
-          this.updateUI();
-          return;
-        }
       }
 
-      // Очищаем 6 нижних линий
+      // 3. Очищаем 6 линий
       for (let i = 0; i < 6; i++) {
         this.board.pop();
         this.board.unshift(Array(COLS).fill(null));
@@ -188,7 +172,8 @@
       this.score += 100; 
       this.updateUI();
       
-      this.freezeTimer = 1000; // 1 секунда паузы
+      // 4. Ставим заморозку на 1 секунду
+      this.freezeTimer = 1000; 
       this.dropTimer = 0;
       this.playDelay = 0;
     }
@@ -256,7 +241,6 @@
       const heights = this.boardHeights(b); 
       const maxHeight = Math.max(...heights);
       
-      // Логика интриги: когда бот в бессмертии и поле забито, он спасается линиями
       if (this.isImmortal && maxHeight >= 15) {
         return clearedLines * 1000 - this.countHoles(b) * 5;
       }
@@ -270,7 +254,7 @@
     }
 
     simulatePlacement(b, matrix, x) {
-      let y = -1; 
+      let y = 0;
       while (!this.collides(b, matrix, x, y + 1)) y++;
       if (this.collides(b, matrix, x, y)) return null;
 
@@ -305,7 +289,7 @@
       variants.forEach((matrix) => {
         const width = matrix[0].length;
         for (let x = 0; x <= COLS - width; x++) {
-          if (this.collides(b, matrix, x, -1)) continue;
+          if (this.collides(b, matrix, x, 0)) continue;
           const sim = this.simulatePlacement(b, matrix, x);
           if (!sim) continue;
           const value = this.scoreBoard(sim.board, sim.cleared);
@@ -388,17 +372,17 @@
     }
 
     update(dt) {
-      if (this.isGameOver) return;
-
+      // Если идет заморозка после ошибки, тикаем таймер и НЕ ДВИГАЕМ фигуру
       if (this.freezeTimer > 0) {
         this.freezeTimer -= dt;
         if (this.freezeTimer <= 0) {
           this.freezeTimer = 0;
-          this.spawnPiece();
+          this.spawnPiece(); // Спавним новую фигуру только когда пауза закончилась
         }
         return; 
       }
 
+      // Если фигуры нет, ничего не делаем
       if (!this.current) return;
 
       this.dropTimer += dt;
@@ -454,7 +438,8 @@
         }
       }
 
-      if (this.current && this.freezeTimer <= 0 && !this.isGameOver) {
+      // Рисуем фигуру, только если она есть и нет заморозки
+      if (this.current && this.freezeTimer <= 0) {
         for (let r = 0; r < this.current.matrix.length; r++) {
           for (let c = 0; c < this.current.matrix[r].length; c++) {
             if (!this.current.matrix[r][c]) continue;
@@ -462,16 +447,6 @@
             if (y >= 0) drawBlock(this.current.x + c, y, COLORS[this.current.type]);
           }
         }
-      }
-
-      if (this.isGameOver) {
-        this.ctx.fillStyle = "rgba(0,0,0,0.6)";
-        this.ctx.fillRect(0, 0, w, h);
-        this.ctx.fillStyle = "#fff";
-        this.ctx.font = `bold ${Math.floor(h / 12)}px sans-serif`;
-        this.ctx.textAlign = "center";
-        this.ctx.textBaseline = "middle";
-        this.ctx.fillText("GAME OVER", w / 2, h / 2);
       }
     }
   }
