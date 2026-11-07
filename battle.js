@@ -4,10 +4,6 @@
   const ROWS = 20;
   const CELL = 26;
 
-  // Скорость падения (больше = медленнее)
-  const BASE_DROP_INTERVAL = 350;
-  const MIN_DROP_INTERVAL = 120;
-
   const SHAPES = {
     I: [[1, 1, 1, 1]],
     O: [[1, 1], [1, 1]],
@@ -40,23 +36,18 @@
       const p = sounds.drop.play();
       if (p && p.then) {
         p.then(() => {
-          sounds.drop.volume = 0.5;
-          sounds.clear.volume = 0.5;
-          sounds.gameover.volume = 0.5;
+          sounds.drop.volume = 0.5; sounds.clear.volume = 0.5; sounds.gameover.volume = 0.5;
           audioUnlocked = true;
         }).catch(() => {
+          // Fallback для некоторых браузеров
           try {
             const AC = window.AudioContext || window.webkitAudioContext;
             if (AC) {
               const ctx = new AC();
-              if (ctx.state === 'suspended') {
-                ctx.resume().then(() => {
-                  sounds.drop.volume = 0.5;
-                  sounds.clear.volume = 0.5;
-                  sounds.gameover.volume = 0.5;
-                  audioUnlocked = true;
-                }).catch(() => {});
-              }
+              if (ctx.state === 'suspended') ctx.resume().then(() => {
+                sounds.drop.volume = 0.5; sounds.clear.volume = 0.5; sounds.gameover.volume = 0.5;
+                audioUnlocked = true;
+              }).catch(() => {});
             }
           } catch (e) {}
         });
@@ -85,25 +76,30 @@
       this.id = id;
       this.canvas = document.getElementById(canvasId);
       this.ctx = this.canvas.getContext("2d");
+      
+      // Задаем внутреннее разрешение холста для четкости (пропорция 1 : 2.2)
+      this.canvas.width = 260;
+      this.canvas.height = 572; 
+
       this.scoreEl = document.getElementById(scoreId);
       this.linesEl = document.getElementById(linesId);
       this.livesEl = document.getElementById(livesId);
-
+      
       this.lives = 3;
       this.isImmortal = false;
       this.isGameOver = false;
-
+      
       this.board = [];
       this.current = null;
       this.score = 0;
       this.linesCleared = 0;
-      this.dropInterval = BASE_DROP_INTERVAL;
+      this.dropInterval = 120;
       this.dropTimer = 0;
       this.playDelay = 0;
       this.currentPlan = null;
-
-      this.freezeTimer = 0;
-
+      
+      this.freezeTimer = 0; 
+      
       this.initLivesUI();
     }
 
@@ -134,7 +130,7 @@
       this.isGameOver = false;
       this.dropTimer = 0;
       this.playDelay = 0;
-      this.dropInterval = BASE_DROP_INTERVAL;
+      this.dropInterval = 120;
       this.freezeTimer = 0;
       this.current = null;
       this.currentPlan = null;
@@ -151,10 +147,9 @@
         type,
         matrix: SHAPES[type].map(r => r.slice()),
         x: Math.floor((COLS - SHAPES[type][0].length) / 2),
-        y: 0
+        y: -1 // Спавн над полем
       };
 
-      // Ошибка (overflow) — ТОЛЬКО если фигура физически не влезает при спавне
       if (this.collides(this.board, this.current.matrix, this.current.x, this.current.y)) {
         this.handleOverflow();
       } else {
@@ -164,34 +159,36 @@
 
     handleOverflow() {
       playSound("gameover");
-
-      this.current = null;
+      
+      this.current = null; 
       this.currentPlan = null;
 
-      if (this.isGameOver) return;
-
-      // Списываем жизнь
-      this.lives--;
-      if (this.lives < 0) this.lives = 0;
-      this.updateLivesUI();
-      this.isImmortal = (this.lives === 1);
-
-      if (this.lives <= 0) {
-        this.isGameOver = true;
-        this.updateUI();
-        return;
+      if (!this.isImmortal) {
+        this.lives--;
+        this.updateLivesUI();
+        
+        if (this.lives === 1) {
+          this.isImmortal = true;
+        }
+        if (this.lives <= 0) {
+          this.lives = 0;
+          this.isGameOver = true;
+          this.updateLivesUI();
+          this.updateUI();
+          return;
+        }
       }
 
-      // Штрафная очистка: убираем 4 нижние линии (сдвигаем доску вниз)
-      for (let i = 0; i < 4; i++) {
+      // Очищаем 6 нижних линий
+      for (let i = 0; i < 6; i++) {
         this.board.pop();
         this.board.unshift(Array(COLS).fill(null));
       }
-
-      this.score += 100;
+      
+      this.score += 100; 
       this.updateUI();
-
-      this.freezeTimer = 1500;
+      
+      this.freezeTimer = 1000; // 1 секунда паузы
       this.dropTimer = 0;
       this.playDelay = 0;
     }
@@ -256,9 +253,10 @@
     }
 
     scoreBoard(b, clearedLines) {
-      const heights = this.boardHeights(b);
+      const heights = this.boardHeights(b); 
       const maxHeight = Math.max(...heights);
-
+      
+      // Логика интриги: когда бот в бессмертии и поле забито, он спасается линиями
       if (this.isImmortal && maxHeight >= 15) {
         return clearedLines * 1000 - this.countHoles(b) * 5;
       }
@@ -272,7 +270,7 @@
     }
 
     simulatePlacement(b, matrix, x) {
-      let y = 0;
+      let y = -1; 
       while (!this.collides(b, matrix, x, y + 1)) y++;
       if (this.collides(b, matrix, x, y)) return null;
 
@@ -307,7 +305,7 @@
       variants.forEach((matrix) => {
         const width = matrix[0].length;
         for (let x = 0; x <= COLS - width; x++) {
-          if (this.collides(b, matrix, x, 0)) continue;
+          if (this.collides(b, matrix, x, -1)) continue;
           const sim = this.simulatePlacement(b, matrix, x);
           if (!sim) continue;
           const value = this.scoreBoard(sim.board, sim.cleared);
@@ -358,7 +356,7 @@
     }
 
     lockPiece() {
-      if (!this.current || this.isGameOver) return;
+      if (!this.current) return;
       playSound("drop");
       for (let r = 0; r < this.current.matrix.length; r++) {
         for (let c = 0; c < this.current.matrix[r].length; c++) {
@@ -382,7 +380,7 @@
         playSound("clear");
         this.linesCleared += cleared;
         this.score += [0, 100, 300, 500, 800][cleared] * 10;
-        this.dropInterval = Math.max(MIN_DROP_INTERVAL, BASE_DROP_INTERVAL - this.linesCleared * 3);
+        this.dropInterval = Math.max(40, 120 - this.linesCleared);
         this.updateUI();
       }
 
@@ -398,7 +396,7 @@
           this.freezeTimer = 0;
           this.spawnPiece();
         }
-        return;
+        return; 
       }
 
       if (!this.current) return;
@@ -467,15 +465,13 @@
       }
 
       if (this.isGameOver) {
-        this.ctx.fillStyle = "rgba(0,0,0,0.65)";
+        this.ctx.fillStyle = "rgba(0,0,0,0.6)";
         this.ctx.fillRect(0, 0, w, h);
         this.ctx.fillStyle = "#fff";
         this.ctx.font = `bold ${Math.floor(h / 12)}px sans-serif`;
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
-        this.ctx.fillText("GAME OVER", w / 2, h / 2 - h / 20);
-        this.ctx.font = `${Math.floor(h / 24)}px sans-serif`;
-        this.ctx.fillText("Restart in 10s...", w / 2, h / 2 + h / 12);
+        this.ctx.fillText("GAME OVER", w / 2, h / 2);
       }
     }
   }
@@ -484,11 +480,8 @@
   let p1, p2;
   let paused = false;
   let lastTime = 0;
-  let restartTimeout = null;
 
   function initMatch() {
-    if (restartTimeout) { clearTimeout(restartTimeout); restartTimeout = null; }
-
     paused = false;
     pauseBtn.textContent = "Pause";
     lastTime = 0;
@@ -498,16 +491,6 @@
 
     p1.reset();
     p2.reset();
-  }
-
-  function scheduleAutoRestartIfNeeded() {
-    const anyGameOver = (p1 && p1.isGameOver) || (p2 && p2.isGameOver);
-    if (anyGameOver && !restartTimeout) {
-      restartTimeout = setTimeout(() => {
-        restartTimeout = null;
-        initMatch();
-      }, 10000);
-    }
   }
 
   function gameLoop(time = 0) {
@@ -521,8 +504,6 @@
 
     p1.draw();
     p2.draw();
-
-    scheduleAutoRestartIfNeeded();
 
     requestAnimationFrame(gameLoop);
   }
