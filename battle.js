@@ -64,7 +64,7 @@
       this.canvas = document.getElementById(canvasId);
       this.ctx = this.canvas.getContext("2d");
       
-      // Настройка четкости (Retina / DPR)
+      // Четкость для Retina
       const dpr = window.devicePixelRatio || 1;
       const rect = this.canvas.getBoundingClientRect();
       this.canvas.width = rect.width * dpr;
@@ -151,23 +151,23 @@
       this.current = null; 
       this.currentPlan = null;
 
+      // Списание жизни
       if (!this.isImmortal) {
         this.lives--;
         this.updateLivesUI();
         
+        // Если осталась 1 жизнь — включаем бессмертие
         if (this.lives === 1) {
           this.isImmortal = true;
         }
       }
 
-      for (let i = 0; i < 6; i++) {
-        this.board.pop();
-        this.board.unshift(Array(COLS).fill(null));
-      }
-      
-      this.score += 100; 
+      // СБРОС ПОЛЯ (начинает заново, но очки сохраняются)
+      this.board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+      this.linesCleared = 0; // Сброс линий для статистики
       this.updateUI();
       
+      // Пауза на 1 секунду перед новым спавном
       this.freezeTimer = 1000; 
       this.dropTimer = 0;
       this.playDelay = 0;
@@ -236,10 +236,13 @@
       const heights = this.boardHeights(b); 
       const maxHeight = Math.max(...heights);
       
-      if (this.isImmortal && maxHeight >= 15) {
-        return clearedLines * 1000 - this.countHoles(b) * 5;
+      // ИНТРИГА: Если поле забито на 2/3 (высота 13+), бот включает "режим бога"
+      if (maxHeight >= 13) {
+        // Огромный приоритет сбору линий и штраф за дырки, чтобы спастись
+        return clearedLines * 1000 - this.countHoles(b) * 10;
       }
 
+      // Обычный режим игры
       return (
         -0.51 * this.aggregateHeight(heights) +
         -0.35 * this.countHoles(b) +
@@ -398,7 +401,6 @@
     }
 
     draw() {
-      // Берем РЕАЛЬНЫЙ размер на экране (CSS), а не внутреннее разрешение
       const rect = this.canvas.getBoundingClientRect();
       const w = rect.width;
       const h = rect.height;
@@ -408,7 +410,6 @@
 
       this.ctx.clearRect(0, 0, w, h);
 
-      // Сетка
       this.ctx.strokeStyle = "rgba(255,255,255,0.06)";
       this.ctx.lineWidth = 1;
       for (let c = 1; c < COLS; c++) {
@@ -426,7 +427,6 @@
 
       const drawBlock = (x, y, color) => {
         this.ctx.fillStyle = color;
-        // Оставляем 1px зазор для эффекта отдельных блоков
         this.ctx.fillRect(x * cellW, y * cellH, cellW - 1, cellH - 1);
       };
 
