@@ -122,6 +122,7 @@
         y: 0
       };
 
+      // Если при спавне фигура сразу врезается в блоки — значит поле забито
       if (this.collides(this.board, this.current.matrix, this.current.x, this.current.y)) {
         this.handleOverflow();
       } else {
@@ -132,24 +133,27 @@
     handleOverflow() {
       playSound("gameover");
       
+      // Если еще не включилось бессмертие, снимаем жизнь
       if (!this.isImmortal) {
         this.lives--;
         this.updateLivesUI();
         
+        // Если осталась 1 жизнь — включаем бессмертие
         if (this.lives === 1) {
           this.isImmortal = true;
         }
       }
 
-      // Очищаем 4 нижние линии
+      // Принудительно очищаем 4 нижние линии, чтобы дать боту место
       for (let i = 0; i < 4; i++) {
         this.board.pop();
         this.board.unshift(Array(COLS).fill(null));
       }
       
-      this.score += 100;
+      this.score += 100; 
       this.updateUI();
       
+      // Рекурсивно спавним новую фигуру
       this.spawnPiece();
     }
 
@@ -217,10 +221,14 @@
     scoreBoard(b, clearedLines) {
       let maxHeight = Math.max(...this.boardHeights(b));
       
+      // ЛОГИКА ИНТРИГИ: Если жизни кончились и поле забито высоко (высота 15+)
+      // Бот плюет на ровность и собирает ЛЮБЫЕ линии.
       if (this.isImmortal && maxHeight >= 15) {
-        return clearedLines * 1000 - this.countHoles(b) * 10;
+        // Огромный приоритет линиям, чтобы спастись
+        return clearedLines * 1000 - this.countHoles(b) * 5;
       }
 
+      // Обычная логика (стабильная игра)
       return (
         -0.51 * this.aggregateHeight(b) +
         -0.35 * this.countHoles(b) +
