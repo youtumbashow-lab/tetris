@@ -2,7 +2,7 @@
   // ---------- Constants ----------
   const COLS = 10;
   const ROWS = 20;
-  const CELL = 26; // Немного уменьшили под баттл
+  const CELL = 26;
 
   const SHAPES = {
     I: [[1, 1, 1, 1]],
@@ -26,26 +26,42 @@
   };
 
   // ---------- Sounds ----------
-  const sounds = {
-    drop: new Audio('drop.wav'),
-    clear: new Audio('clear.wav'),
-    gameover: new Audio('gameover.wav')
+  let sounds = {
+    drop: null,
+    clear: null,
+    gameover: null
   };
 
   let audioUnlocked = false;
 
-  // Разблокировка звука при первом клике
   function unlockAudio() {
     if (audioUnlocked) return;
-    const silentSound = new Audio('drop.wav');
-    silentSound.volume = 0;
-    silentSound.play().then(() => {
-      audioUnlocked = true;
-      Object.values(sounds).forEach(sound => {
-        sound.volume = 0.5; // Ставим нормальную громкость
-      });
-    }).catch(() => {});
     
+    try {
+      sounds.drop = new Audio('drop.wav');
+      sounds.clear = new Audio('clear.wav');
+      sounds.gameover = new Audio('gameover.wav');
+
+      sounds.drop.load();
+      sounds.clear.load();
+      sounds.gameover.load();
+
+      sounds.drop.volume = 0;
+      sounds.drop.play()
+        .then(() => {
+          sounds.drop.volume = 0.5;
+          sounds.clear.volume = 0.5;
+          sounds.gameover.volume = 0.5;
+          audioUnlocked = true;
+          console.log("Звук разблокирован и готов к работе!");
+        })
+        .catch((err) => {
+          console.error("Браузер все еще блокирует звук или файл не найден:", err);
+        });
+    } catch (e) {
+      console.error("Ошибка при инициализации звука:", e);
+    }
+
     document.removeEventListener('click', unlockAudio);
     document.removeEventListener('keydown', unlockAudio);
   }
@@ -53,11 +69,14 @@
   document.addEventListener('click', unlockAudio);
   document.addEventListener('keydown', unlockAudio);
 
-  function playSound(sound) {
-    if (!audioUnlocked || !sound) return;
+  function playSound(soundKey) {
+    if (!audioUnlocked) return;
+    const sound = sounds[soundKey];
+    if (!sound) return;
+
     try {
       sound.currentTime = 0;
-      sound.play().catch(e => {});
+      sound.play().catch(e => console.error(`Ошибка воспроизведения ${soundKey}:`, e));
     } catch (e) {}
   }
 
@@ -69,8 +88,8 @@
   const overlayDesc = document.getElementById("overlayDesc");
   const overlayRestart = document.getElementById("overlayRestart");
 
-  // ---------- Game Logic (Class for Player) ----------
-  class TetrisBot {
+  // ---------- Game Logic ----------
+  class TetrisPlayer {
     constructor(id, canvasId, scoreId, linesId, livesId) {
       this.id = id;
       this.canvas = document.getElementById(canvasId);
@@ -89,7 +108,7 @@
       this.gameOver = false;
       this.dropInterval = 120;
       this.dropTimer = 0;
-      this.botDelay = 0;
+      this.playDelay = 0;
       this.currentPlan = null;
       
       this.initLivesUI();
@@ -124,7 +143,7 @@
       }
       this.gameOver = false;
       this.dropTimer = 0;
-      this.botDelay = 0;
+      this.playDelay = 0;
       this.dropInterval = 120;
       this.current = null;
       this.spawnPiece();
@@ -147,15 +166,13 @@
     }
 
     die() {
-      playSound(sounds.gameover);
+      playSound("gameover");
       this.lives--;
       this.updateLivesUI();
       
       if (this.lives > 0) {
-        // Есть еще жизни - перезапускаем поле, но сохраняем очки
         this.reset(true); 
       } else {
-        // Жизни кончились
         this.gameOver = true;
         window.dispatchEvent(new CustomEvent('playerDied', { detail: this.id }));
       }
@@ -166,7 +183,6 @@
       this.linesEl.textContent = this.linesCleared;
     }
 
-    // --- Bot Logic ---
     collides(b, matrix, offsetX, offsetY) {
       for (let r = 0; r < matrix.length; r++) {
         for (let c = 0; c < matrix[r].length; c++) {
@@ -316,7 +332,7 @@
     }
 
     lockPiece() {
-      playSound(sounds.drop);
+      playSound("drop");
       for (let r = 0; r < this.current.matrix.length; r++) {
         for (let c = 0; c < this.current.matrix[r].length; c++) {
           if (!this.current.matrix[r][c]) continue;
@@ -336,7 +352,7 @@
       }
 
       if (cleared > 0) {
-        playSound(sounds.clear);
+        playSound("clear");
         this.linesCleared += cleared;
         this.score += [0, 100, 300, 500, 800][cleared] * 10;
         this.dropInterval = Math.max(40, 120 - (this.linesCleared / 10) * 10);
@@ -350,10 +366,10 @@
       if (this.gameOver) return;
 
       this.dropTimer += dt;
-      this.botDelay += dt;
+      this.playDelay += dt;
 
-      if (this.botDelay >= 80) {
-        this.botDelay = 0;
+      if (this.playDelay >= 80) {
+        this.playDelay = 0;
         const moved = this.applyBestMove();
         if (!moved) this.lockPiece();
       }
@@ -422,8 +438,8 @@
     pauseBtn.textContent = "Pause";
     lastTime = 0;
 
-    p1 = new TetrisBot("p1", "board1", "score1", "lines1", "lives1");
-    p2 = new TetrisBot("p2", "board2", "score2", "lines2", "lives2");
+    p1 = new TetrisPlayer("p1", "board1", "score1", "lines1", "lives1");
+    p2 = new TetrisPlayer("p2", "board2", "score2", "lines2", "lives2");
 
     p1.reset();
     p2.reset();
@@ -438,7 +454,8 @@
     const winner = winnerId === "p1" ? p1 : p2;
     const loser = loserId === "p1" ? p1 : p2;
 
-    overlayTitle.textContent = `BOT ${winnerId.toUpperCase()} WINS!`;
+    const winnerName = winnerId === "p1" ? "PLAYER 1" : "PLAYER 2";
+    overlayTitle.textContent = `${winnerName} WINS!`;
     overlayDesc.innerHTML = `Score: <b>${winner.score}</b> vs ${loser.score}`;
     overlay.classList.remove("hidden");
   });
