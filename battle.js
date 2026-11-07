@@ -77,6 +77,8 @@
       this.playDelay = 0;
       this.currentPlan = null;
       
+      this.freezeTimer = 0; // Таймер паузы после ошибки
+      
       this.initLivesUI();
     }
 
@@ -107,6 +109,7 @@
       this.dropTimer = 0;
       this.playDelay = 0;
       this.dropInterval = 120;
+      this.freezeTimer = 0;
       this.current = null;
       this.updateLivesUI();
       this.spawnPiece();
@@ -114,18 +117,21 @@
     }
 
     spawnPiece() {
+      if (this.freezeTimer > 0) return; // Если заморожены — не спавним
+
       const type = TYPES[(Math.random() * TYPES.length) | 0];
       this.current = {
         type,
         matrix: SHAPES[type].map(r => r.slice()),
         x: Math.floor((COLS - SHAPES[type][0].length) / 2),
-        y: 0
+        y: -1 // Начинаем чуть выше поля
       };
 
-      // Если при спавне фигура сразу врезается в блоки — значит поле забито
       if (this.collides(this.board, this.current.matrix, this.current.x, this.current.y)) {
+        // Поле забито — ошибка
         this.handleOverflow();
       } else {
+        this.current.y = 0; // Если нормально, ставим на 0
         this.currentPlan = this.findBestMove(this.board, this.current);
       }
     }
@@ -133,7 +139,7 @@
     handleOverflow() {
       playSound("gameover");
       
-      // Если еще не включилось бессмертие, снимаем жизнь
+      // Списываем жизнь, если еще не бессмертный
       if (!this.isImmortal) {
         this.lives--;
         this.updateLivesUI();
@@ -144,7 +150,7 @@
         }
       }
 
-      // Принудительно очищаем 4 нижние линии, чтобы дать боту место
+      // Очищаем 4 нижние линии
       for (let i = 0; i < 4; i++) {
         this.board.pop();
         this.board.unshift(Array(COLS).fill(null));
@@ -153,8 +159,9 @@
       this.score += 100; 
       this.updateUI();
       
-      // Рекурсивно спавним новую фигуру
-      this.spawnPiece();
+      // Ставим заморозку на 1 секунду, чтобы всё не сгорело моментально
+      this.freezeTimer = 1000; 
+      this.current = null; // Убираем фигуру с экрана
     }
 
     updateUI() {
@@ -170,6 +177,7 @@
           const x = offsetX + c;
           const y = offsetY + r;
           if (x < 0 || x >= COLS || y >= ROWS) return true;
+          // Если y меньше 0, мы над полем — коллизий с блокировками нет
           if (y >= 0 && b[y][x]) return true;
         }
       }
@@ -221,14 +229,11 @@
     scoreBoard(b, clearedLines) {
       let maxHeight = Math.max(...this.boardHeights(b));
       
-      // ЛОГИКА ИНТРИГИ: Если жизни кончились и поле забито высоко (высота 15+)
-      // Бот плюет на ровность и собирает ЛЮБЫЕ линии.
+      // ИНТРИГА: В бессмертии при высокой забитости (15+) бот собирает линии
       if (this.isImmortal && maxHeight >= 15) {
-        // Огромный приоритет линиям, чтобы спастись
         return clearedLines * 1000 - this.countHoles(b) * 5;
       }
 
-      // Обычная логика (стабильная игра)
       return (
         -0.51 * this.aggregateHeight(b) +
         -0.35 * this.countHoles(b) +
@@ -238,7 +243,7 @@
     }
 
     simulatePlacement(b, matrix, x) {
-      let y = 0;
+      let y = -1; // Начинаем симуляцию над полем
       while (!this.collides(b, matrix, x, y + 1)) y++;
       if (this.collides(b, matrix, x, y)) return null;
 
@@ -273,7 +278,7 @@
       variants.forEach((matrix) => {
         const width = matrix[0].length;
         for (let x = 0; x <= COLS - width; x++) {
-          if (this.collides(b, matrix, x, 0)) continue;
+          if (this.collides(b, matrix, x, -1)) continue;
           const sim = this.simulatePlacement(b, matrix, x);
           if (!sim) continue;
           const value = this.scoreBoard(sim.board, sim.cleared);
@@ -353,6 +358,18 @@
     }
 
     update(dt) {
+      // Если идет заморозка после ошибки — просто ждем
+      if (this.freezeTimer > 0) {
+        this.freezeTimer -= dt;
+        if (this.freezeTimer <= 0) {
+          this.freezeTimer = 0;
+          this.spawnPiece(); // Спавним новую фигуру после паузы
+        }
+        return; 
+      }
+
+      if (!this.current) return;
+
       this.dropTimer += dt;
       this.playDelay += dt;
 
@@ -406,6 +423,7 @@
           for (let c = 0; c < this.current.matrix[r].length; c++) {
             if (!this.current.matrix[r][c]) continue;
             const y = this.current.y + r;
+            // Рисуем, только если блок в пределах поля
             if (y >= 0) drawBlock(this.current.x + c, y, COLORS[this.current.type]);
           }
         }
