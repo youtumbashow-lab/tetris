@@ -25,7 +25,7 @@
     height: -0.510066, holes: -0.35663, bumpiness: -0.184483, lineClears: 0.760666,
   };
 
-  // ---------- Sounds ----------
+  // ---------- Sounds (MP3) ----------
   let sounds = {
     drop: null,
     clear: null,
@@ -38,9 +38,9 @@
     if (audioUnlocked) return;
     
     try {
-      sounds.drop = new Audio('drop.wav');
-      sounds.clear = new Audio('clear.wav');
-      sounds.gameover = new Audio('gameover.wav');
+      sounds.drop = new Audio('drop.mp3');
+      sounds.clear = new Audio('clear.mp3');
+      sounds.gameover = new Audio('gameover.mp3');
 
       sounds.drop.load();
       sounds.clear.load();
@@ -53,13 +53,13 @@
           sounds.clear.volume = 0.5;
           sounds.gameover.volume = 0.5;
           audioUnlocked = true;
-          console.log("Звук разблокирован и готов к работе!");
+          console.log("Звук разблокирован!");
         })
         .catch((err) => {
-          console.error("Браузер все еще блокирует звук или файл не найден:", err);
+          console.error("Ошибка звука:", err);
         });
     } catch (e) {
-      console.error("Ошибка при инициализации звука:", e);
+      console.error("Ошибка инициализации звука:", e);
     }
 
     document.removeEventListener('click', unlockAudio);
@@ -76,7 +76,7 @@
 
     try {
       sound.currentTime = 0;
-      sound.play().catch(e => console.error(`Ошибка воспроизведения ${soundKey}:`, e));
+      sound.play().catch(e => {});
     } catch (e) {}
   }
 
