@@ -28,13 +28,13 @@
 
   // ---------- Sounds ----------
   const sounds = {
-    drop: new Audio('drop.mp3'),
-    clear: new Audio('clear.mp3'),
-    gameover: new Audio('gameover.mp3')
+    drop: new Audio('drop.wav'),
+    clear: new Audio('clear.wav'),
+    gameover: new Audio('gameover.wav')
   };
 
   function playSound(sound) {
-    sound.currentTime = 0; // сброс, чтобы можно было играть быстро подряд
+    sound.currentTime = 0;
     sound.play().catch(e => console.log("Audio play blocked:", e));
   }
 
@@ -52,11 +52,22 @@
   const finalScoreEl = document.getElementById("finalScore");
   const overlayRestart = document.getElementById("overlayRestart");
 
+  // Создаем элемент для обратного отсчета прямо в оверлее
+  const timerEl = document.createElement("p");
+  timerEl.style.marginTop = "10px";
+  timerEl.style.fontSize = "14px";
+  timerEl.style.color = "#9aa7b8";
+  timerEl.textContent = "Auto-restarting in 10s...";
+  overlay.querySelector('.overlay-content').appendChild(timerEl);
+
   // ---------- State ----------
   let board, current, nextPiece, score, linesCleared, level, paused, gameOver;
   let dropTimer = 0, dropInterval = 150, lastTime = 0;
   let botDelay = 0;         
   let currentPlan = null;   
+  
+  let autoRestartTimer = null; // Таймер перезапуска
+  let countdownInterval = null; // Интервал обновления текста
 
   function createEmptyBoard() {
     return Array.from({ length: ROWS }, () => Array(COLS).fill(null));
@@ -252,7 +263,7 @@
   }
 
   function lockPiece() {
-    playSound(sounds.drop); // ЗВУК: фигура приземлилась
+    playSound(sounds.drop);
 
     for (let r = 0; r < current.matrix.length; r++) {
       for (let c = 0; c < current.matrix[r].length; c++) {
@@ -274,7 +285,7 @@
     }
 
     if (cleared > 0) {
-      playSound(sounds.clear); // ЗВУК: линия собрана
+      playSound(sounds.clear);
       linesCleared += cleared;
       score += [0, 100, 300, 500, 800][cleared] * level;
       level = Math.floor(linesCleared / 10) + 1;
@@ -287,9 +298,26 @@
 
   function endGame() {
     gameOver = true;
-    playSound(sounds.gameover); // ЗВУК: конец игры
+    playSound(sounds.gameover);
     finalScoreEl.textContent = score;
     overlay.classList.remove("hidden");
+
+    // --- Логика авто-перезапуска ---
+    let timeLeft = 10;
+    timerEl.textContent = `Auto-restarting in ${timeLeft}s...`;
+
+    // Обновляем текст каждую секунду
+    countdownInterval = setInterval(() => {
+      timeLeft--;
+      if (timeLeft > 0) {
+        timerEl.textContent = `Auto-restarting in ${timeLeft}s...`;
+      }
+    }, 1000);
+
+    // Сам перезапуск через 10 секунд
+    autoRestartTimer = setTimeout(() => {
+      reset();
+    }, 10000);
   }
 
   function drawCell(context, x, y, color, size, alpha = 1) {
@@ -394,6 +422,10 @@
   }
 
   function reset() {
+    // Отменяем таймеры, если перезапуск произошел вручную
+    if (autoRestartTimer) clearTimeout(autoRestartTimer);
+    if (countdownInterval) clearInterval(countdownInterval);
+
     board = createEmptyBoard();
     score = 0;
     linesCleared = 0;
