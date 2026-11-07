@@ -21,74 +21,41 @@
 
   const TYPES = Object.keys(SHAPES);
 
-  const WEIGHTS = {
-    height: -0.510066, holes: -0.35663, bumpiness: -0.184483, lineClears: 0.760666,
-  };
-
   // ---------- Sounds (MP3) ----------
-  let sounds = {
-    drop: null,
-    clear: null,
-    gameover: null
-  };
-
+  let sounds = { drop: null, clear: null, gameover: null };
   let audioUnlocked = false;
 
   function unlockAudio() {
     if (audioUnlocked) return;
-    
     try {
       sounds.drop = new Audio('drop.mp3');
       sounds.clear = new Audio('clear.mp3');
       sounds.gameover = new Audio('gameover.mp3');
-
-      sounds.drop.load();
-      sounds.clear.load();
-      sounds.gameover.load();
-
+      sounds.drop.load(); sounds.clear.load(); sounds.gameover.load();
       sounds.drop.volume = 0;
-      sounds.drop.play()
-        .then(() => {
-          sounds.drop.volume = 0.5;
-          sounds.clear.volume = 0.5;
-          sounds.gameover.volume = 0.5;
-          audioUnlocked = true;
-          console.log("Звук разблокирован!");
-        })
-        .catch((err) => {
-          console.error("Ошибка звука:", err);
-        });
-    } catch (e) {
-      console.error("Ошибка инициализации звука:", e);
-    }
-
+      sounds.drop.play().then(() => {
+        sounds.drop.volume = 0.5; sounds.clear.volume = 0.5; sounds.gameover.volume = 0.5;
+        audioUnlocked = true;
+      }).catch(() => {});
+    } catch (e) {}
     document.removeEventListener('click', unlockAudio);
     document.removeEventListener('keydown', unlockAudio);
   }
-
   document.addEventListener('click', unlockAudio);
   document.addEventListener('keydown', unlockAudio);
 
-  function playSound(soundKey) {
+  function playSound(key) {
     if (!audioUnlocked) return;
-    const sound = sounds[soundKey];
+    const sound = sounds[key];
     if (!sound) return;
-
-    try {
-      sound.currentTime = 0;
-      sound.play().catch(e => {});
-    } catch (e) {}
+    try { sound.currentTime = 0; sound.play().catch(() => {}); } catch (e) {}
   }
 
   // ---------- DOM ----------
   const pauseBtn = document.getElementById("pauseBtn");
   const restartBtn = document.getElementById("restartBtn");
-  const overlay = document.getElementById("overlay");
-  const overlayTitle = document.getElementById("overlayTitle");
-  const overlayDesc = document.getElementById("overlayDesc");
-  const overlayRestart = document.getElementById("overlayRestart");
 
-  // ---------- Game Logic ----------
+  // ---------- Player Logic ----------
   class TetrisPlayer {
     constructor(id, canvasId, scoreId, linesId, livesId) {
       this.id = id;
@@ -99,13 +66,12 @@
       this.livesEl = document.getElementById(livesId);
       
       this.lives = 3;
-      this.maxLives = 3;
+      this.isImmortal = false; 
       
       this.board = [];
       this.current = null;
       this.score = 0;
       this.linesCleared = 0;
-      this.gameOver = false;
       this.dropInterval = 120;
       this.dropTimer = 0;
       this.playDelay = 0;
@@ -116,7 +82,7 @@
 
     initLivesUI() {
       this.livesEl.innerHTML = '';
-      for (let i = 0; i < this.maxLives; i++) {
+      for (let i = 0; i < 3; i++) {
         const heart = document.createElement('span');
         heart.className = 'heart';
         heart.innerHTML = '❤';
@@ -127,25 +93,22 @@
     updateLivesUI() {
       const hearts = this.livesEl.querySelectorAll('.heart');
       hearts.forEach((heart, index) => {
-        if (index >= this.lives) {
-          heart.classList.add('lost');
-        } else {
-          heart.classList.remove('lost');
-        }
+        if (index >= this.lives) heart.classList.add('lost');
+        else heart.classList.remove('lost');
       });
     }
 
-    reset(keepScore = false) {
+    reset() {
       this.board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
-      if (!keepScore) {
-        this.score = 0;
-        this.linesCleared = 0;
-      }
-      this.gameOver = false;
+      this.score = 0;
+      this.linesCleared = 0;
+      this.lives = 3;
+      this.isImmortal = false;
       this.dropTimer = 0;
       this.playDelay = 0;
       this.dropInterval = 120;
       this.current = null;
+      this.updateLivesUI();
       this.spawnPiece();
       this.updateUI();
     }
@@ -158,24 +121,36 @@
         x: Math.floor((COLS - SHAPES[type][0].length) / 2),
         y: 0
       };
-      this.currentPlan = this.findBestMove(this.board, this.current);
 
       if (this.collides(this.board, this.current.matrix, this.current.x, this.current.y)) {
-        this.die();
+        this.handleOverflow();
+      } else {
+        this.currentPlan = this.findBestMove(this.board, this.current);
       }
     }
 
-    die() {
+    handleOverflow() {
       playSound("gameover");
-      this.lives--;
-      this.updateLivesUI();
       
-      if (this.lives > 0) {
-        this.reset(true); 
-      } else {
-        this.gameOver = true;
-        window.dispatchEvent(new CustomEvent('playerDied', { detail: this.id }));
+      if (!this.isImmortal) {
+        this.lives--;
+        this.updateLivesUI();
+        
+        if (this.lives === 1) {
+          this.isImmortal = true;
+        }
       }
+
+      // Очищаем 4 нижние линии
+      for (let i = 0; i < 4; i++) {
+        this.board.pop();
+        this.board.unshift(Array(COLS).fill(null));
+      }
+      
+      this.score += 100;
+      this.updateUI();
+      
+      this.spawnPiece();
     }
 
     updateUI() {
@@ -183,6 +158,7 @@
       this.linesEl.textContent = this.linesCleared;
     }
 
+    // --- Bot Logic ---
     collides(b, matrix, offsetX, offsetY) {
       for (let r = 0; r < matrix.length; r++) {
         for (let c = 0; c < matrix[r].length; c++) {
@@ -239,11 +215,17 @@
     }
 
     scoreBoard(b, clearedLines) {
+      let maxHeight = Math.max(...this.boardHeights(b));
+      
+      if (this.isImmortal && maxHeight >= 15) {
+        return clearedLines * 1000 - this.countHoles(b) * 10;
+      }
+
       return (
-        WEIGHTS.height * this.aggregateHeight(b) +
-        WEIGHTS.holes * this.countHoles(b) +
-        WEIGHTS.bumpiness * this.bumpiness(b) +
-        WEIGHTS.lineClears * clearedLines
+        -0.51 * this.aggregateHeight(b) +
+        -0.35 * this.countHoles(b) +
+        -0.18 * this.bumpiness(b) +
+        0.76 * clearedLines
       );
     }
 
@@ -280,7 +262,7 @@
       }
 
       let best = null;
-      variants.forEach((matrix, rotation) => {
+      variants.forEach((matrix) => {
         const width = matrix[0].length;
         for (let x = 0; x <= COLS - width; x++) {
           if (this.collides(b, matrix, x, 0)) continue;
@@ -288,7 +270,7 @@
           if (!sim) continue;
           const value = this.scoreBoard(sim.board, sim.cleared);
           if (!best || value > best.value) {
-            best = { value, rotation, x, matrix };
+            best = { value, x, matrix };
           }
         }
       });
@@ -363,8 +345,6 @@
     }
 
     update(dt) {
-      if (this.gameOver) return;
-
       this.dropTimer += dt;
       this.playDelay += dt;
 
@@ -413,7 +393,7 @@
         }
       }
 
-      if (this.current && !this.gameOver) {
+      if (this.current) {
         for (let r = 0; r < this.current.matrix.length; r++) {
           for (let c = 0; c < this.current.matrix[r].length; c++) {
             if (!this.current.matrix[r][c]) continue;
@@ -428,13 +408,10 @@
   // ---------- Match Control ----------
   let p1, p2;
   let paused = false;
-  let matchOver = false;
   let lastTime = 0;
 
   function initMatch() {
-    matchOver = false;
     paused = false;
-    overlay.classList.add("hidden");
     pauseBtn.textContent = "Pause";
     lastTime = 0;
 
@@ -445,26 +422,11 @@
     p2.reset();
   }
 
-  window.addEventListener('playerDied', (e) => {
-    if (matchOver) return;
-    matchOver = true;
-    const loserId = e.detail;
-    const winnerId = loserId === "p1" ? "p2" : "p1";
-    
-    const winner = winnerId === "p1" ? p1 : p2;
-    const loser = loserId === "p1" ? p1 : p2;
-
-    const winnerName = winnerId === "p1" ? "PLAYER 1" : "PLAYER 2";
-    overlayTitle.textContent = `${winnerName} WINS!`;
-    overlayDesc.innerHTML = `Score: <b>${winner.score}</b> vs ${loser.score}`;
-    overlay.classList.remove("hidden");
-  });
-
   function gameLoop(time = 0) {
     const dt = time - lastTime;
     lastTime = time;
 
-    if (!paused && !matchOver) {
+    if (!paused) {
       p1.update(dt);
       p2.update(dt);
     }
@@ -476,13 +438,11 @@
   }
 
   pauseBtn.addEventListener("click", () => {
-    if (matchOver) return;
     paused = !paused;
     pauseBtn.textContent = paused ? "Resume" : "Pause";
   });
 
   restartBtn.addEventListener("click", initMatch);
-  overlayRestart.addEventListener("click", initMatch);
 
   // Старт
   initMatch();
