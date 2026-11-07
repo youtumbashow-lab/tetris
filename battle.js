@@ -77,7 +77,7 @@
       this.playDelay = 0;
       this.currentPlan = null;
       
-      this.freezeTimer = 0; // Таймер паузы после ошибки
+      this.freezeTimer = 0; 
       
       this.initLivesUI();
     }
@@ -112,26 +112,24 @@
       this.freezeTimer = 0;
       this.current = null;
       this.updateLivesUI();
-      this.spawnPiece();
       this.updateUI();
+      this.spawnPiece();
     }
 
     spawnPiece() {
-      if (this.freezeTimer > 0) return; // Если заморожены — не спавним
+      if (this.freezeTimer > 0) return;
 
       const type = TYPES[(Math.random() * TYPES.length) | 0];
       this.current = {
         type,
         matrix: SHAPES[type].map(r => r.slice()),
         x: Math.floor((COLS - SHAPES[type][0].length) / 2),
-        y: -1 // Начинаем чуть выше поля
+        y: 0 
       };
 
       if (this.collides(this.board, this.current.matrix, this.current.x, this.current.y)) {
-        // Поле забито — ошибка
         this.handleOverflow();
       } else {
-        this.current.y = 0; // Если нормально, ставим на 0
         this.currentPlan = this.findBestMove(this.board, this.current);
       }
     }
@@ -139,18 +137,21 @@
     handleOverflow() {
       playSound("gameover");
       
-      // Списываем жизнь, если еще не бессмертный
+      // 1. Удаляем текущую фигуру, чтобы она не вызывала бесконечную ошибку
+      this.current = null; 
+      this.currentPlan = null;
+
+      // 2. Списываем жизнь
       if (!this.isImmortal) {
         this.lives--;
         this.updateLivesUI();
         
-        // Если осталась 1 жизнь — включаем бессмертие
         if (this.lives === 1) {
           this.isImmortal = true;
         }
       }
 
-      // Очищаем 4 нижние линии
+      // 3. Очищаем 4 нижние линии
       for (let i = 0; i < 4; i++) {
         this.board.pop();
         this.board.unshift(Array(COLS).fill(null));
@@ -159,9 +160,8 @@
       this.score += 100; 
       this.updateUI();
       
-      // Ставим заморозку на 1 секунду, чтобы всё не сгорело моментально
-      this.freezeTimer = 1000; 
-      this.current = null; // Убираем фигуру с экрана
+      // 4. Ставим заморозку на 1.5 секунды (1500 мс)
+      this.freezeTimer = 1500; 
     }
 
     updateUI() {
@@ -169,7 +169,6 @@
       this.linesEl.textContent = this.linesCleared;
     }
 
-    // --- Bot Logic ---
     collides(b, matrix, offsetX, offsetY) {
       for (let r = 0; r < matrix.length; r++) {
         for (let c = 0; c < matrix[r].length; c++) {
@@ -177,7 +176,6 @@
           const x = offsetX + c;
           const y = offsetY + r;
           if (x < 0 || x >= COLS || y >= ROWS) return true;
-          // Если y меньше 0, мы над полем — коллизий с блокировками нет
           if (y >= 0 && b[y][x]) return true;
         }
       }
@@ -229,7 +227,6 @@
     scoreBoard(b, clearedLines) {
       let maxHeight = Math.max(...this.boardHeights(b));
       
-      // ИНТРИГА: В бессмертии при высокой забитости (15+) бот собирает линии
       if (this.isImmortal && maxHeight >= 15) {
         return clearedLines * 1000 - this.countHoles(b) * 5;
       }
@@ -243,7 +240,7 @@
     }
 
     simulatePlacement(b, matrix, x) {
-      let y = -1; // Начинаем симуляцию над полем
+      let y = 0;
       while (!this.collides(b, matrix, x, y + 1)) y++;
       if (this.collides(b, matrix, x, y)) return null;
 
@@ -278,7 +275,7 @@
       variants.forEach((matrix) => {
         const width = matrix[0].length;
         for (let x = 0; x <= COLS - width; x++) {
-          if (this.collides(b, matrix, x, -1)) continue;
+          if (this.collides(b, matrix, x, 0)) continue;
           const sim = this.simulatePlacement(b, matrix, x);
           if (!sim) continue;
           const value = this.scoreBoard(sim.board, sim.cleared);
@@ -291,7 +288,7 @@
     }
 
     applyBestMove() {
-      if (!this.currentPlan) return false;
+      if (!this.currentPlan || !this.current) return false;
       const target = this.currentPlan;
 
       if (!this.matricesEqual(this.current.matrix, target.matrix)) {
@@ -327,6 +324,7 @@
     }
 
     lockPiece() {
+      if (!this.current) return;
       playSound("drop");
       for (let r = 0; r < this.current.matrix.length; r++) {
         for (let c = 0; c < this.current.matrix[r].length; c++) {
@@ -358,12 +356,11 @@
     }
 
     update(dt) {
-      // Если идет заморозка после ошибки — просто ждем
       if (this.freezeTimer > 0) {
         this.freezeTimer -= dt;
         if (this.freezeTimer <= 0) {
           this.freezeTimer = 0;
-          this.spawnPiece(); // Спавним новую фигуру после паузы
+          this.spawnPiece();
         }
         return; 
       }
@@ -418,12 +415,12 @@
         }
       }
 
-      if (this.current) {
+      // Рисуем фигуру, только если она есть и мы не в заморозке
+      if (this.current && this.freezeTimer <= 0) {
         for (let r = 0; r < this.current.matrix.length; r++) {
           for (let c = 0; c < this.current.matrix[r].length; c++) {
             if (!this.current.matrix[r][c]) continue;
             const y = this.current.y + r;
-            // Рисуем, только если блок в пределах поля
             if (y >= 0) drawBlock(this.current.x + c, y, COLORS[this.current.type]);
           }
         }
