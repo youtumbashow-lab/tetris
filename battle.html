@@ -6,74 +6,153 @@
   <title>Super Tetris - Battle</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    body { flex-direction: column; gap: 20px; }
+    /* Стили для вертикального формата (Shorts) */
+    body { 
+      flex-direction: column; 
+      gap: 20px; 
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 50%, #1b2233, #0b0e14 70%);
+    }
+
+    .short-mode {
+      display: flex; 
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      max-width: 450px; /* Ограничиваем ширину для эффекта вертикального видео */
+      width: 100%;
+      gap: 15px;
+      padding: 10px;
+    }
+
     .battle-container {
-      display: flex; gap: 20px; align-items: flex-start; justify-content: center;
-      padding: 20px; background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 18px;
+      display: flex; 
+      gap: 10px; /* Уменьшили зазор между полями */
+      align-items: stretch;
+      justify-content: center;
+      padding: 15px; 
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08); 
+      border-radius: 18px;
+      width: 100%;
     }
-    .player-panel { display: flex; flex-direction: column; gap: 10px; width: 260px; }
+
+    .player-panel { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 10px; 
+      flex: 1; /* Поля делят место поровну */
+      min-width: 0;
+    }
+
     .player-header {
-      display: flex; justify-content: space-between; align-items: center;
-      background: rgba(124, 196, 255, 0.1); padding: 10px;
-      border-radius: 10px; border: 1px solid rgba(124, 196, 255, 0.2);
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center;
+      background: rgba(124, 196, 255, 0.1); 
+      padding: 8px;
+      border-radius: 10px; 
+      border: 1px solid rgba(124, 196, 255, 0.2);
+      font-size: 14px;
     }
-    .player-name { font-size: 18px; font-weight: bold; color: #7cc4ff; }
-    .lives { display: flex; gap: 5px; }
-    .heart { color: #ef476f; font-size: 20px; transition: opacity 0.3s; }
+
+    .player-name { font-weight: bold; color: #7cc4ff; }
+    .lives { display: flex; gap: 3px; }
+    .heart { color: #ef476f; font-size: 16px; transition: opacity 0.3s; }
     .heart.lost { opacity: 0.2; }
+
+    /* Растягиваем холст по вертикали */
     .battle-canvas {
-      background: #0d1117; border-radius: 10px;
+      background: #0d1117; 
+      border-radius: 10px;
       border: 1px solid rgba(255, 255, 255, 0.07);
-      width: 260px; height: 520px; 
+      width: 100%; 
+      height: auto;
+      aspect-ratio: 1 / 2.2; /* Пропорции поля 1 к 2.2 (более вытянутые) */
+      display: block;
     }
+
     .battle-stats {
-      display: flex; justify-content: space-between; font-size: 14px;
-      color: #9aa7b8; background: rgba(255, 255, 255, 0.02);
-      padding: 8px 12px; border-radius: 8px;
+      display: flex; 
+      flex-direction: column; /* Текст друг под другом из-за узости */
+      font-size: 12px;
+      color: #9aa7b8; 
+      background: rgba(255, 255, 255, 0.02);
+      padding: 6px 8px; 
+      border-radius: 8px;
+      gap: 4px;
     }
+
     .battle-stats b { color: #e6edf7; }
+
     .vs-divider {
-      display: flex; align-items: center; justify-content: center;
-      font-size: 32px; font-weight: bold; color: #ef476f;
-      margin-top: 200px; text-shadow: 0 0 10px rgba(239, 71, 111, 0.5);
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
+      font-size: 24px; 
+      font-weight: bold; 
+      color: #ef476f;
+      text-shadow: 0 0 10px rgba(239, 71, 111, 0.5);
+      padding: 0 5px;
+    }
+
+    .controls {
+      display: flex; 
+      gap: 10px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .controls button {
+      flex: 1;
+      padding: 12px;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <div class="battle-container">
-    <!-- Игрок 1 -->
-    <div class="player-panel">
-      <div class="player-header">
-        <span class="player-name">PLAYER 1</span>
-        <div class="lives" id="lives1"></div>
+  
+  <!-- Контейнер, имитирующий вертикальное видео -->
+  <div class="short-mode">
+    
+    <div class="battle-container">
+      <!-- Игрок 1 -->
+      <div class="player-panel">
+        <div class="player-header">
+          <span class="player-name">PLAYER 1</span>
+          <div class="lives" id="lives1"></div>
+        </div>
+        <canvas id="board1" class="battle-canvas"></canvas>
+        <div class="battle-stats">
+          <span>Score: <b id="score1">0</b></span>
+          <span>Lines: <b id="lines1">0</b></span>
+        </div>
       </div>
-      <canvas id="board1" class="battle-canvas" width="260" height="520"></canvas>
-      <div class="battle-stats">
-        <span>Score: <b id="score1">0</b></span>
-        <span>Lines: <b id="lines1">0</b></span>
+
+      <div class="vs-divider">VS</div>
+
+      <!-- Игрок 2 -->
+      <div class="player-panel">
+        <div class="player-header">
+          <span class="player-name">PLAYER 2</span>
+          <div class="lives" id="lives2"></div>
+        </div>
+        <canvas id="board2" class="battle-canvas"></canvas>
+        <div class="battle-stats">
+          <span>Score: <b id="score2">0</b></span>
+          <span>Lines: <b id="lines2">0</b></span>
+        </div>
       </div>
     </div>
 
-    <div class="vs-divider">VS</div>
-
-    <!-- Игрок 2 -->
-    <div class="player-panel">
-      <div class="player-header">
-        <span class="player-name">PLAYER 2</span>
-        <div class="lives" id="lives2"></div>
-      </div>
-      <canvas id="board2" class="battle-canvas" width="260" height="520"></canvas>
-      <div class="battle-stats">
-        <span>Score: <b id="score2">0</b></span>
-        <span>Lines: <b id="lines2">0</b></span>
-      </div>
+    <div class="controls">
+      <button id="pauseBtn">Pause</button>
+      <button id="restartBtn">Restart Battle</button>
     </div>
-  </div>
 
-  <div class="buttons" style="flex-direction: row; width: 100%; justify-content: center;">
-    <button id="pauseBtn" style="width: 150px;">Pause</button>
-    <button id="restartBtn" style="width: 150px;">Restart Battle</button>
   </div>
 
   <script src="battle.js"></script>
