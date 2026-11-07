@@ -2,8 +2,8 @@
   // ---------- Constants ----------
   const COLS = 10;
   const ROWS = 20;
-  const CELL = 30;          // cell size on the main board
-  const NEXT_CELL = 24;     // cell size in the preview
+  const CELL = 30;          
+  const NEXT_CELL = 24;     
 
   const SHAPES = {
     I: [[1, 1, 1, 1]],
@@ -16,24 +16,27 @@
   };
 
   const COLORS = {
-    I: "#4cc9f0",
-    O: "#ffd166",
-    T: "#c77dff",
-    S: "#06d6a0",
-    Z: "#ef476f",
-    J: "#5b8cff",
-    L: "#ff9f43",
+    I: "#4cc9f0", O: "#ffd166", T: "#c77dff",
+    S: "#06d6a0", Z: "#ef476f", J: "#5b8cff", L: "#ff9f43",
   };
 
   const TYPES = Object.keys(SHAPES);
 
-  // Heuristic weights (classic Tetris bot weights)
   const WEIGHTS = {
-    height: -0.510066,
-    holes: -0.35663,
-    bumpiness: -0.184483,
-    lineClears: 0.760666,
+    height: -0.510066, holes: -0.35663, bumpiness: -0.184483, lineClears: 0.760666,
   };
+
+  // ---------- Sounds ----------
+  const sounds = {
+    drop: new Audio('drop.mp3'),
+    clear: new Audio('clear.mp3'),
+    gameover: new Audio('gameover.mp3')
+  };
+
+  function playSound(sound) {
+    sound.currentTime = 0; // сброс, чтобы можно было играть быстро подряд
+    sound.play().catch(e => console.log("Audio play blocked:", e));
+  }
 
   // ---------- DOM ----------
   const canvas = document.getElementById("board");
@@ -52,8 +55,8 @@
   // ---------- State ----------
   let board, current, nextPiece, score, linesCleared, level, paused, gameOver;
   let dropTimer = 0, dropInterval = 150, lastTime = 0;
-  let botDelay = 0;         // delay between bot moves
-  let currentPlan = null;   // {rotation, x} for the current piece
+  let botDelay = 0;         
+  let currentPlan = null;   
 
   function createEmptyBoard() {
     return Array.from({ length: ROWS }, () => Array(COLS).fill(null));
@@ -65,13 +68,9 @@
   }
 
   function makePiece(type) {
-    return {
-      type,
-      matrix: SHAPES[type].map((row) => row.slice()),
-    };
+    return { type, matrix: SHAPES[type].map((row) => row.slice()) };
   }
 
-  // ---------- Rotations ----------
   function rotate(matrix, dir = 1) {
     const n = matrix.length;
     const m = matrix[0].length;
@@ -95,7 +94,6 @@
     return variants;
   }
 
-  // ---------- Collisions ----------
   function collides(boardState, matrix, offsetX, offsetY) {
     for (let r = 0; r < matrix.length; r++) {
       for (let c = 0; c < matrix[r].length; c++) {
@@ -109,7 +107,6 @@
     return false;
   }
 
-  // ---------- Bot: Heuristics ----------
   function boardHeights(b) {
     const heights = Array(COLS).fill(0);
     for (let c = 0; c < COLS; c++) {
@@ -155,7 +152,6 @@
     );
   }
 
-  // Simulate placing a piece in a specific position
   function simulatePlacement(b, matrix, x) {
     let y = 0;
     while (!collides(b, matrix, x, y + 1)) y++;
@@ -170,7 +166,6 @@
         if (yy >= 0) clone[yy][xx] = matrix[r][c];
       }
     }
-    // clear lines
     let cleared = 0;
     for (let r = ROWS - 1; r >= 0; r--) {
       if (clone[r].every((cell) => cell)) {
@@ -183,11 +178,9 @@
     return { board: clone, cleared };
   }
 
-  // Choose the best move
   function findBestMove(b, piece) {
     const rotations = allRotations(piece.matrix);
     let best = null;
-
     rotations.forEach((matrix, rotation) => {
       const width = matrix[0].length;
       for (let x = 0; x <= COLS - width; x++) {
@@ -203,13 +196,10 @@
     return best;
   }
 
-  // ---------- Apply bot move ----------
   function applyBestMove() {
     if (currentPlan === null) return false;
-
     const target = currentPlan;
 
-    // 1) Rotate
     const desired = target.matrix;
     if (!matricesEqual(current.matrix, desired)) {
       const rotated = rotate(current.matrix, 1);
@@ -219,7 +209,6 @@
       }
     }
 
-    // 2) Shift
     if (current.x < target.x) {
       if (!collides(board, current.matrix, current.x + 1, current.y)) {
         current.x++;
@@ -232,12 +221,10 @@
       }
     }
 
-    // 3) Drop down
     if (!collides(board, current.matrix, current.x, current.y + 1)) {
       current.y++;
       return true;
     }
-
     return false;
   }
 
@@ -249,7 +236,6 @@
     return true;
   }
 
-  // ---------- Game Logic ----------
   function spawnPiece() {
     current = {
       ...nextPiece,
@@ -266,6 +252,8 @@
   }
 
   function lockPiece() {
+    playSound(sounds.drop); // ЗВУК: фигура приземлилась
+
     for (let r = 0; r < current.matrix.length; r++) {
       for (let c = 0; c < current.matrix[r].length; c++) {
         if (!current.matrix[r][c]) continue;
@@ -275,7 +263,6 @@
       }
     }
 
-    // clear lines
     let cleared = 0;
     for (let r = ROWS - 1; r >= 0; r--) {
       if (board[r].every((cell) => cell)) {
@@ -287,6 +274,7 @@
     }
 
     if (cleared > 0) {
+      playSound(sounds.clear); // ЗВУК: линия собрана
       linesCleared += cleared;
       score += [0, 100, 300, 500, 800][cleared] * level;
       level = Math.floor(linesCleared / 10) + 1;
@@ -299,11 +287,11 @@
 
   function endGame() {
     gameOver = true;
+    playSound(sounds.gameover); // ЗВУК: конец игры
     finalScoreEl.textContent = score;
     overlay.classList.remove("hidden");
   }
 
-  // ---------- Rendering ----------
   function drawCell(context, x, y, color, size, alpha = 1) {
     context.globalAlpha = alpha;
     context.fillStyle = color;
@@ -314,7 +302,6 @@
   function drawBoard() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // grid
     ctx.strokeStyle = "rgba(255,255,255,0.04)";
     ctx.lineWidth = 1;
     for (let c = 1; c < COLS; c++) {
@@ -330,7 +317,6 @@
       ctx.stroke();
     }
 
-    // placed blocks
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         if (board[r][c]) {
@@ -339,7 +325,6 @@
       }
     }
 
-    // current piece
     if (current && !gameOver) {
       for (let r = 0; r < current.matrix.length; r++) {
         for (let c = 0; c < current.matrix[r].length; c++) {
@@ -378,7 +363,6 @@
     levelEl.textContent = level;
   }
 
-  // ---------- Game Loop ----------
   function gameLoop(time = 0) {
     const dt = time - lastTime;
     lastTime = time;
@@ -387,7 +371,6 @@
       dropTimer += dt;
       botDelay += dt;
 
-      // bot moves (approx. 90 ms per step)
       if (botDelay >= 90) {
         botDelay = 0;
         const moved = applyBestMove();
@@ -396,7 +379,6 @@
         }
       }
 
-      // forced drop by timer (safety net)
       if (dropTimer >= dropInterval) {
         dropTimer = 0;
         if (!collides(board, current.matrix, current.x, current.y + 1)) {
@@ -411,7 +393,6 @@
     requestAnimationFrame(gameLoop);
   }
 
-  // ---------- Init & Controls ----------
   function reset() {
     board = createEmptyBoard();
     score = 0;
