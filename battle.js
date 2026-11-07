@@ -32,10 +32,33 @@
     gameover: new Audio('gameover.wav')
   };
 
+  let audioUnlocked = false;
+
+  // Разблокировка звука при первом клике
+  function unlockAudio() {
+    if (audioUnlocked) return;
+    const silentSound = new Audio('drop.wav');
+    silentSound.volume = 0;
+    silentSound.play().then(() => {
+      audioUnlocked = true;
+      Object.values(sounds).forEach(sound => {
+        sound.volume = 0.5; // Ставим нормальную громкость
+      });
+    }).catch(() => {});
+    
+    document.removeEventListener('click', unlockAudio);
+    document.removeEventListener('keydown', unlockAudio);
+  }
+
+  document.addEventListener('click', unlockAudio);
+  document.addEventListener('keydown', unlockAudio);
+
   function playSound(sound) {
-    if (!sound) return;
-    sound.currentTime = 0;
-    sound.play().catch(e => {});
+    if (!audioUnlocked || !sound) return;
+    try {
+      sound.currentTime = 0;
+      sound.play().catch(e => {});
+    } catch (e) {}
   }
 
   // ---------- DOM ----------
@@ -315,7 +338,6 @@
       if (cleared > 0) {
         playSound(sounds.clear);
         this.linesCleared += cleared;
-        // Даем очки, чтобы стимулировать соревнование
         this.score += [0, 100, 300, 500, 800][cleared] * 10;
         this.dropInterval = Math.max(40, 120 - (this.linesCleared / 10) * 10);
         this.updateUI();
@@ -349,7 +371,6 @@
     draw() {
       this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-      // Сетка
       this.ctx.strokeStyle = "rgba(255,255,255,0.04)";
       this.ctx.lineWidth = 1;
       for (let c = 1; c < COLS; c++) {
@@ -365,7 +386,6 @@
         this.ctx.stroke();
       }
 
-      // Блоки
       const drawBlock = (x, y, color) => {
         this.ctx.fillStyle = color;
         this.ctx.fillRect(x * CELL, y * CELL, CELL - 1, CELL - 1);
@@ -377,7 +397,6 @@
         }
       }
 
-      // Текущая фигура
       if (this.current && !this.gameOver) {
         for (let r = 0; r < this.current.matrix.length; r++) {
           for (let c = 0; c < this.current.matrix[r].length; c++) {
