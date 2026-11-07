@@ -4,6 +4,10 @@
   const ROWS = 20;
   const CELL = 26;
 
+  // Скорость падения (больше = медленнее). Было 120, стало 350.
+  const BASE_DROP_INTERVAL = 350;
+  const MIN_DROP_INTERVAL = 120;
+
   const SHAPES = {
     I: [[1, 1, 1, 1]],
     O: [[1, 1], [1, 1]],
@@ -21,7 +25,7 @@
 
   const TYPES = Object.keys(SHAPES);
 
-  // ---------- Sounds (MP3) ----------
+  // ---------- Sounds ----------
   let sounds = { drop: null, clear: null, gameover: null };
   let audioUnlocked = false;
 
@@ -38,19 +42,7 @@
         p.then(() => {
           sounds.drop.volume = 0.5; sounds.clear.volume = 0.5; sounds.gameover.volume = 0.5;
           audioUnlocked = true;
-        }).catch(() => {
-          // Fallback: попробовать разблокировать через AudioContext
-          try {
-            const AC = window.AudioContext || window.webkitAudioContext;
-            if (AC) {
-              const ctx = new AC();
-              if (ctx.state === 'suspended') ctx.resume().then(() => {
-                sounds.drop.volume = 0.5; sounds.clear.volume = 0.5; sounds.gameover.volume = 0.5;
-                audioUnlocked = true;
-              }).catch(() => {});
-            }
-          } catch (e) {}
-        });
+        }).catch(() => {});
       }
     } catch (e) {}
     document.removeEventListener('click', unlockAudio);
@@ -79,22 +71,24 @@
       this.scoreEl = document.getElementById(scoreId);
       this.linesEl = document.getElementById(linesId);
       this.livesEl = document.getElementById(livesId);
-      
+
       this.lives = 3;
+      // isImmortal теперь влияет ТОЛЬКО на ИИ (агрессивная очистка),
+      // но НЕ блокирует списание жизней.
       this.isImmortal = false;
-      this.isGameOver = false; // защита от бесконечного цикла при lives = 0
-      
+      this.isGameOver = false;
+
       this.board = [];
       this.current = null;
       this.score = 0;
       this.linesCleared = 0;
-      this.dropInterval = 120;
+      this.dropInterval = BASE_DROP_INTERVAL;
       this.dropTimer = 0;
       this.playDelay = 0;
       this.currentPlan = null;
-      
-      this.freezeTimer = 0; 
-      
+
+      this.freezeTimer = 0;
+
       this.initLivesUI();
     }
 
@@ -125,7 +119,7 @@
       this.isGameOver = false;
       this.dropTimer = 0;
       this.playDelay = 0;
-      this.dropInterval = 120;
+      this.dropInterval = BASE_DROP_INTERVAL;
       this.freezeTimer = 0;
       this.current = null;
       this.currentPlan = null;
@@ -135,6 +129,7 @@
     }
 
     spawnPiece() {
+      // Не спавним при заморозке или game over
       if (this.freezeTimer > 0 || this.isGameOver) return;
 
       const type = TYPES[(Math.random() * TYPES.length) | 0];
@@ -142,7 +137,7 @@
         type,
         matrix: SHAPES[type].map(r => r.slice()),
         x: Math.floor((COLS - SHAPES[type][0].length) / 2),
-        y: 0 
+        y: 0
       };
 
       if (this.collides(this.board, this.current.matrix, this.current.x, this.current.y)) {
@@ -154,41 +149,38 @@
 
     handleOverflow() {
       playSound("gameover");
-      
-      // 1. Удаляем текущую фигуру, чтобы она не вызывала бесконечную ошибку
-      this.current = null; 
+
+      // 1. Убираем текущую фигуру — она вызвала overflow
+      this.current = null;
       this.currentPlan = null;
 
-      // 2. Списываем жизнь
-      if (!this.isImmortal) {
+      // 2. Всегда списываем жизнь (isImmortal больше не блокирует)
+      if (!this.isGameOver) {
         this.lives--;
+        if (this.lives < 0) this.lives = 0;
         this.updateLivesUI();
-        
-        if (this.lives === 1) {
-          this.isImmortal = true;
-        }
-        // Защита: если жизни закончились (не должно случиться при текущей механике,
-        // но на случай изменения логики) — game over
+
+        // Флаг для ИИ: при 1 жизни бот играет агрессивнее
+        this.isImmortal = (this.lives === 1);
+
         if (this.lives <= 0) {
-          this.lives = 0;
           this.isGameOver = true;
-          this.updateLivesUI();
           this.updateUI();
-          return;
+          return; // game over — доску не чистим, рисуем оверлей
         }
       }
 
-      // 3. Очищаем 4 нижние линии (штрафная очистка, linesCleared не увеличиваем)
+      // 3. Штрафная очистка 4 нижних линий
       for (let i = 0; i < 4; i++) {
         this.board.pop();
         this.board.unshift(Array(COLS).fill(null));
       }
-      
-      this.score += 100; 
+
+      this.score += 100;
       this.updateUI();
-      
-      // 4. Заморозка на 1.5 секунды + сброс таймеров,
-      //    чтобы новая фигура не упала мгновенно
+
+      // 4. Заморозка + сброс таймеров, чтобы новая фигура не упала мгновенно
+      //    и не вызвала повторный overflow на следующем кадре
       this.freezeTimer = 1500;
       this.dropTimer = 0;
       this.playDelay = 0;
@@ -254,9 +246,9 @@
     }
 
     scoreBoard(b, clearedLines) {
-      const heights = this.boardHeights(b); // кэшируем один раз
+      const heights = this.boardHeights(b);
       const maxHeight = Math.max(...heights);
-      
+
       if (this.isImmortal && maxHeight >= 15) {
         return clearedLines * 1000 - this.countHoles(b) * 5;
       }
@@ -356,7 +348,7 @@
     }
 
     lockPiece() {
-      if (!this.current) return;
+      if (!this.current || this.isGameOver) return;
       playSound("drop");
       for (let r = 0; r < this.current.matrix.length; r++) {
         for (let c = 0; c < this.current.matrix[r].length; c++) {
@@ -380,8 +372,7 @@
         playSound("clear");
         this.linesCleared += cleared;
         this.score += [0, 100, 300, 500, 800][cleared] * 10;
-        // Упрощённая формула: 120 - linesCleared, но не менее 40
-        this.dropInterval = Math.max(40, 120 - this.linesCleared);
+        this.dropInterval = Math.max(MIN_DROP_INTERVAL, BASE_DROP_INTERVAL - this.linesCleared * 3);
         this.updateUI();
       }
 
@@ -397,7 +388,7 @@
           this.freezeTimer = 0;
           this.spawnPiece();
         }
-        return; 
+        return;
       }
 
       if (!this.current) return;
@@ -422,7 +413,6 @@
     }
 
     draw() {
-      // Используем реальные размеры canvas, а не COLS*CELL / ROWS*CELL
       const w = this.canvas.width;
       const h = this.canvas.height;
       const cellW = w / COLS;
@@ -456,7 +446,6 @@
         }
       }
 
-      // Рисуем фигуру, только если она есть и мы не в заморозке
       if (this.current && this.freezeTimer <= 0 && !this.isGameOver) {
         for (let r = 0; r < this.current.matrix.length; r++) {
           for (let c = 0; c < this.current.matrix[r].length; c++) {
@@ -467,15 +456,16 @@
         }
       }
 
-      // Индикация game over
       if (this.isGameOver) {
-        this.ctx.fillStyle = "rgba(0,0,0,0.6)";
+        this.ctx.fillStyle = "rgba(0,0,0,0.65)";
         this.ctx.fillRect(0, 0, w, h);
         this.ctx.fillStyle = "#fff";
         this.ctx.font = `bold ${Math.floor(h / 12)}px sans-serif`;
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
-        this.ctx.fillText("GAME OVER", w / 2, h / 2);
+        this.ctx.fillText("GAME OVER", w / 2, h / 2 - h / 20);
+        this.ctx.font = `${Math.floor(h / 24)}px sans-serif`;
+        this.ctx.fillText("Restart in 10s...", w / 2, h / 2 + h / 12);
       }
     }
   }
@@ -484,8 +474,11 @@
   let p1, p2;
   let paused = false;
   let lastTime = 0;
+  let restartTimeout = null;
 
   function initMatch() {
+    if (restartTimeout) { clearTimeout(restartTimeout); restartTimeout = null; }
+
     paused = false;
     pauseBtn.textContent = "Pause";
     lastTime = 0;
@@ -495,6 +488,17 @@
 
     p1.reset();
     p2.reset();
+  }
+
+  function scheduleAutoRestartIfNeeded() {
+    // Если кто-то в game over и таймер ещё не запущен — запускаем авто-рестарт
+    const anyGameOver = (p1 && p1.isGameOver) || (p2 && p2.isGameOver);
+    if (anyGameOver && !restartTimeout) {
+      restartTimeout = setTimeout(() => {
+        restartTimeout = null;
+        initMatch();
+      }, 10000);
+    }
   }
 
   function gameLoop(time = 0) {
@@ -509,6 +513,8 @@
     p1.draw();
     p2.draw();
 
+    scheduleAutoRestartIfNeeded();
+
     requestAnimationFrame(gameLoop);
   }
 
@@ -519,7 +525,6 @@
 
   restartBtn.addEventListener("click", initMatch);
 
-  // Старт
   initMatch();
   requestAnimationFrame(gameLoop);
 })();
