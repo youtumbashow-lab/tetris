@@ -1,9 +1,9 @@
 (() => {
-  // ---------- Константы ----------
+  // ---------- Constants ----------
   const COLS = 10;
   const ROWS = 20;
-  const CELL = 30;          // размер клетки на основном поле
-  const NEXT_CELL = 24;     // размер клетки в превью
+  const CELL = 30;          // cell size on the main board
+  const NEXT_CELL = 24;     // cell size in the preview
 
   const SHAPES = {
     I: [[1, 1, 1, 1]],
@@ -27,7 +27,7 @@
 
   const TYPES = Object.keys(SHAPES);
 
-  // Веса эвристики (как в классических тетрис-ботах)
+  // Heuristic weights (classic Tetris bot weights)
   const WEIGHTS = {
     height: -0.510066,
     holes: -0.35663,
@@ -49,11 +49,11 @@
   const finalScoreEl = document.getElementById("finalScore");
   const overlayRestart = document.getElementById("overlayRestart");
 
-  // ---------- Состояние ----------
+  // ---------- State ----------
   let board, current, nextPiece, score, linesCleared, level, paused, gameOver;
   let dropTimer = 0, dropInterval = 150, lastTime = 0;
-  let botDelay = 0;         // пауза между ходами бота
-  let currentPlan = null;   // {rotation, x} для текущей фигуры
+  let botDelay = 0;         // delay between bot moves
+  let currentPlan = null;   // {rotation, x} for the current piece
 
   function createEmptyBoard() {
     return Array.from({ length: ROWS }, () => Array(COLS).fill(null));
@@ -71,7 +71,7 @@
     };
   }
 
-  // ---------- Повороты ----------
+  // ---------- Rotations ----------
   function rotate(matrix, dir = 1) {
     const n = matrix.length;
     const m = matrix[0].length;
@@ -95,7 +95,7 @@
     return variants;
   }
 
-  // ---------- Коллизии ----------
+  // ---------- Collisions ----------
   function collides(boardState, matrix, offsetX, offsetY) {
     for (let r = 0; r < matrix.length; r++) {
       for (let c = 0; c < matrix[r].length; c++) {
@@ -109,7 +109,7 @@
     return false;
   }
 
-  // ---------- Бот: эвристики ----------
+  // ---------- Bot: Heuristics ----------
   function boardHeights(b) {
     const heights = Array(COLS).fill(0);
     for (let c = 0; c < COLS; c++) {
@@ -155,7 +155,7 @@
     );
   }
 
-  // Симуляция постановки фигуры в конкретную позицию
+  // Simulate placing a piece in a specific position
   function simulatePlacement(b, matrix, x) {
     let y = 0;
     while (!collides(b, matrix, x, y + 1)) y++;
@@ -170,7 +170,7 @@
         if (yy >= 0) clone[yy][xx] = matrix[r][c];
       }
     }
-    // убираем заполненные линии
+    // clear lines
     let cleared = 0;
     for (let r = ROWS - 1; r >= 0; r--) {
       if (clone[r].every((cell) => cell)) {
@@ -183,7 +183,7 @@
     return { board: clone, cleared };
   }
 
-  // Выбор лучшего хода
+  // Choose the best move
   function findBestMove(b, piece) {
     const rotations = allRotations(piece.matrix);
     let best = null;
@@ -203,13 +203,13 @@
     return best;
   }
 
-  // ---------- Применение хода бота ----------
+  // ---------- Apply bot move ----------
   function applyBestMove() {
     if (currentPlan === null) return false;
 
     const target = currentPlan;
 
-    // 1) Поворот
+    // 1) Rotate
     const desired = target.matrix;
     if (!matricesEqual(current.matrix, desired)) {
       const rotated = rotate(current.matrix, 1);
@@ -219,7 +219,7 @@
       }
     }
 
-    // 2) Сдвиг
+    // 2) Shift
     if (current.x < target.x) {
       if (!collides(board, current.matrix, current.x + 1, current.y)) {
         current.x++;
@@ -232,7 +232,7 @@
       }
     }
 
-    // 3) Сброс вниз
+    // 3) Drop down
     if (!collides(board, current.matrix, current.x, current.y + 1)) {
       current.y++;
       return true;
@@ -249,7 +249,7 @@
     return true;
   }
 
-  // ---------- Логика игры ----------
+  // ---------- Game Logic ----------
   function spawnPiece() {
     current = {
       ...nextPiece,
@@ -275,7 +275,7 @@
       }
     }
 
-    // очистка линий
+    // clear lines
     let cleared = 0;
     for (let r = ROWS - 1; r >= 0; r--) {
       if (board[r].every((cell) => cell)) {
@@ -303,7 +303,7 @@
     overlay.classList.remove("hidden");
   }
 
-  // ---------- Отрисовка ----------
+  // ---------- Rendering ----------
   function drawCell(context, x, y, color, size, alpha = 1) {
     context.globalAlpha = alpha;
     context.fillStyle = color;
@@ -314,7 +314,7 @@
   function drawBoard() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // сетка
+    // grid
     ctx.strokeStyle = "rgba(255,255,255,0.04)";
     ctx.lineWidth = 1;
     for (let c = 1; c < COLS; c++) {
@@ -330,7 +330,7 @@
       ctx.stroke();
     }
 
-    // заполненные клетки
+    // placed blocks
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         if (board[r][c]) {
@@ -339,7 +339,7 @@
       }
     }
 
-    // текущая фигура
+    // current piece
     if (current && !gameOver) {
       for (let r = 0; r < current.matrix.length; r++) {
         for (let c = 0; c < current.matrix[r].length; c++) {
@@ -378,7 +378,7 @@
     levelEl.textContent = level;
   }
 
-  // ---------- Игровой цикл ----------
+  // ---------- Game Loop ----------
   function gameLoop(time = 0) {
     const dt = time - lastTime;
     lastTime = time;
@@ -387,17 +387,16 @@
       dropTimer += dt;
       botDelay += dt;
 
-      // ходы бота (примерно 90 мс на шаг)
+      // bot moves (approx. 90 ms per step)
       if (botDelay >= 90) {
         botDelay = 0;
         const moved = applyBestMove();
         if (!moved) {
-          // фигура уже внизу — фиксируем
           lockPiece();
         }
       }
 
-      // принудительное падение по таймеру (страховка)
+      // forced drop by timer (safety net)
       if (dropTimer >= dropInterval) {
         dropTimer = 0;
         if (!collides(board, current.matrix, current.x, current.y + 1)) {
@@ -412,7 +411,7 @@
     requestAnimationFrame(gameLoop);
   }
 
-  // ---------- Инициализация и управление ----------
+  // ---------- Init & Controls ----------
   function reset() {
     board = createEmptyBoard();
     score = 0;
@@ -425,7 +424,7 @@
     botDelay = 0;
     lastTime = 0;
     overlay.classList.add("hidden");
-    pauseBtn.textContent = "Пауза";
+    pauseBtn.textContent = "Pause";
     nextPiece = randomPiece();
     spawnPiece();
     updateUI();
@@ -435,7 +434,7 @@
   pauseBtn.addEventListener("click", () => {
     if (gameOver) return;
     paused = !paused;
-    pauseBtn.textContent = paused ? "Продолжить" : "Пауза";
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
   });
 
   restartBtn.addEventListener("click", reset);
