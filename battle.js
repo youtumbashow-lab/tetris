@@ -90,7 +90,7 @@
       this.livesEl = document.getElementById(livesId);
 
       this.lives = 3;
-      this.isImmortal = false; // Влияет только на ИИ, не блокирует смерть
+      this.isImmortal = false;
       this.isGameOver = false;
 
       this.board = [];
@@ -154,23 +154,12 @@
         y: 0
       };
 
-      // Честная проверка overflow: либо фигура не влезает, 
-      // либо верхние 4 строки забиты блоками
-      if (this.collides(this.board, this.current.matrix, this.current.x, this.current.y) ||
-          this.topRowsOccupied(4)) {
+      // Ошибка (overflow) — ТОЛЬКО если фигура физически не влезает при спавне
+      if (this.collides(this.board, this.current.matrix, this.current.x, this.current.y)) {
         this.handleOverflow();
       } else {
         this.currentPlan = this.findBestMove(this.board, this.current);
       }
-    }
-
-    topRowsOccupied(n) {
-      for (let r = 0; r < n && r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-          if (this.board[r][c]) return true;
-        }
-      }
-      return false;
     }
 
     handleOverflow() {
@@ -193,18 +182,10 @@
         return;
       }
 
-      // Штрафная очистка: убираем 4 нижние линии
+      // Штрафная очистка: убираем 4 нижние линии (сдвигаем доску вниз)
       for (let i = 0; i < 4; i++) {
         this.board.pop();
         this.board.unshift(Array(COLS).fill(null));
-      }
-
-      // Принудительно освобождаем место для следующей фигуры
-      // (полностью обнуляем верхние 4 строки, чтобы не было бага с зависанием)
-      for (let r = 0; r < 4 && r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-          this.board[r][c] = null;
-        }
       }
 
       this.score += 100;
