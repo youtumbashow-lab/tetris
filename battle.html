@@ -15,6 +15,9 @@
       align-items: center;
       justify-content: center;
       background: radial-gradient(circle at 50% 50%, #1b2233, #0b0e14 70%);
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: #e6edf7;
     }
 
     .short-mode {
@@ -71,7 +74,7 @@
       border: 1px solid rgba(255, 255, 255, 0.07);
       width: 100%; 
       height: auto;
-      aspect-ratio: 1 / 2.2; /* Пропорции поля 1 к 2.2 (более вытянутые) */
+      aspect-ratio: 1 / 2.2; /* Пропорции поля 1 к 2.2 */
       display: block;
     }
 
@@ -110,7 +113,17 @@
       flex: 1;
       padding: 12px;
       font-weight: bold;
+      border-radius: 10px;
+      border: 1px solid rgba(124, 196, 255, 0.35);
+      background: rgba(124, 196, 255, 0.12);
+      color: #cfe6ff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
     }
+
+    .controls button:hover { background: rgba(124, 196, 255, 0.22); }
+    .controls button:active { transform: scale(0.97); }
   </style>
 </head>
 <body>
