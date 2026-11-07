@@ -1,0 +1,113 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 30% 20%, #1b2233, #0b0e14 70%);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  color: #e6edf7;
+}
+
+.game-wrap {
+  display: flex;
+  gap: 24px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+#board {
+  background: #0d1117;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.panel {
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panel h1 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #7cc4ff;
+}
+
+.stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+  color: #9aa7b8;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.stat b { font-size: 18px; color: #e6edf7; }
+
+.next-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  color: #9aa7b8;
+}
+
+#next {
+  background: #0d1117;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  width: 120px;
+  height: 120px;
+  align-self: center;
+}
+
+.buttons { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+
+button {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(124, 196, 255, 0.35);
+  background: rgba(124, 196, 255, 0.12);
+  color: #cfe6ff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+button:hover { background: rgba(124, 196, 255, 0.22); }
+button:active { transform: scale(0.97); }
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 14, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.overlay.hidden { display: none; }
+
+.overlay-content {
+  background: #131a26;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 32px 40px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.overlay-content h2 { font-size: 22px; color: #7cc4ff; }
+.overlay-content p { color: #9aa7b8; font-size: 15px; }
+.overlay-content b { color: #e6edf7; font-size: 20px; }
