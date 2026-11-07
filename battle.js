@@ -2,7 +2,6 @@
   // ---------- Constants ----------
   const COLS = 10;
   const ROWS = 20;
-  const CELL = 26;
 
   const SHAPES = {
     I: [[1, 1, 1, 1]],
@@ -65,16 +64,19 @@
       this.canvas = document.getElementById(canvasId);
       this.ctx = this.canvas.getContext("2d");
       
-      // Разрешение холста (пропорция 1 : 2.2)
-      this.canvas.width = 260;
-      this.canvas.height = 572; 
+      // Настройка четкости (Retina / DPR)
+      const dpr = window.devicePixelRatio || 1;
+      const rect = this.canvas.getBoundingClientRect();
+      this.canvas.width = rect.width * dpr;
+      this.canvas.height = rect.height * dpr;
+      this.ctx.scale(dpr, dpr);
 
       this.scoreEl = document.getElementById(scoreId);
       this.linesEl = document.getElementById(linesId);
       this.livesEl = document.getElementById(livesId);
       
       this.lives = 3;
-      this.isImmortal = false;
+      this.isImmortal = false; 
       
       this.board = [];
       this.current = null;
@@ -126,7 +128,6 @@
     }
 
     spawnPiece() {
-      // Если идет заморозка после ошибки, мы просто ждем
       if (this.freezeTimer > 0) return;
 
       const type = TYPES[(Math.random() * TYPES.length) | 0];
@@ -134,10 +135,9 @@
         type,
         matrix: SHAPES[type].map(r => r.slice()),
         x: Math.floor((COLS - SHAPES[type][0].length) / 2),
-        y: 0 // Спавним на 0, чтобы избежать визуальных багов
+        y: 0 
       };
 
-      // Проверка на переполнение (Game Over)
       if (this.collides(this.board, this.current.matrix, this.current.x, this.current.y)) {
         this.handleOverflow();
       } else {
@@ -148,22 +148,18 @@
     handleOverflow() {
       playSound("gameover");
       
-      // 1. Убираем фигуру с экрана
       this.current = null; 
       this.currentPlan = null;
 
-      // 2. Списываем жизнь
       if (!this.isImmortal) {
         this.lives--;
         this.updateLivesUI();
         
-        // Включаем бессмертие при 1 жизни
         if (this.lives === 1) {
           this.isImmortal = true;
         }
       }
 
-      // 3. Очищаем 6 линий
       for (let i = 0; i < 6; i++) {
         this.board.pop();
         this.board.unshift(Array(COLS).fill(null));
@@ -172,7 +168,6 @@
       this.score += 100; 
       this.updateUI();
       
-      // 4. Ставим заморозку на 1 секунду
       this.freezeTimer = 1000; 
       this.dropTimer = 0;
       this.playDelay = 0;
@@ -372,17 +367,15 @@
     }
 
     update(dt) {
-      // Если идет заморозка после ошибки, тикаем таймер и НЕ ДВИГАЕМ фигуру
       if (this.freezeTimer > 0) {
         this.freezeTimer -= dt;
         if (this.freezeTimer <= 0) {
           this.freezeTimer = 0;
-          this.spawnPiece(); // Спавним новую фигуру только когда пауза закончилась
+          this.spawnPiece();
         }
         return; 
       }
 
-      // Если фигуры нет, ничего не делаем
       if (!this.current) return;
 
       this.dropTimer += dt;
@@ -405,14 +398,18 @@
     }
 
     draw() {
-      const w = this.canvas.width;
-      const h = this.canvas.height;
+      // Берем РЕАЛЬНЫЙ размер на экране (CSS), а не внутреннее разрешение
+      const rect = this.canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      
       const cellW = w / COLS;
       const cellH = h / ROWS;
 
       this.ctx.clearRect(0, 0, w, h);
 
-      this.ctx.strokeStyle = "rgba(255,255,255,0.04)";
+      // Сетка
+      this.ctx.strokeStyle = "rgba(255,255,255,0.06)";
       this.ctx.lineWidth = 1;
       for (let c = 1; c < COLS; c++) {
         this.ctx.beginPath();
@@ -429,6 +426,7 @@
 
       const drawBlock = (x, y, color) => {
         this.ctx.fillStyle = color;
+        // Оставляем 1px зазор для эффекта отдельных блоков
         this.ctx.fillRect(x * cellW, y * cellH, cellW - 1, cellH - 1);
       };
 
@@ -438,7 +436,6 @@
         }
       }
 
-      // Рисуем фигуру, только если она есть и нет заморозки
       if (this.current && this.freezeTimer <= 0) {
         for (let r = 0; r < this.current.matrix.length; r++) {
           for (let c = 0; c < this.current.matrix[r].length; c++) {
