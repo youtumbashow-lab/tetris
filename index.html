@@ -1,113 +1,36 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: radial-gradient(circle at 30% 20%, #1b2233, #0b0e14 70%);
-  font-family: "Segoe UI", system-ui, sans-serif;
-  color: #e6edf7;
-}
-
-.game-wrap {
-  display: flex;
-  gap: 24px;
-  padding: 24px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-}
-
-#board {
-  background: #0d1117;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.panel {
-  width: 200px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.panel h1 {
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  color: #7cc4ff;
-}
-
-.stat {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-size: 14px;
-  color: #9aa7b8;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.stat b { font-size: 18px; color: #e6edf7; }
-
-.next-box {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 13px;
-  color: #9aa7b8;
-}
-
-#next {
-  background: #0d1117;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  width: 120px;
-  height: 120px;
-  align-self: center;
-}
-
-.buttons { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
-
-button {
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(124, 196, 255, 0.35);
-  background: rgba(124, 196, 255, 0.12);
-  color: #cfe6ff;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
-}
-
-button:hover { background: rgba(124, 196, 255, 0.22); }
-button:active { transform: scale(0.97); }
-
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(5, 8, 14, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(4px);
-}
-
-.overlay.hidden { display: none; }
-
-.overlay-content {
-  background: #131a26;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 32px 40px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.overlay-content h2 { font-size: 22px; color: #7cc4ff; }
-.overlay-content p { color: #9aa7b8; font-size: 15px; }
-.overlay-content b { color: #e6edf7; font-size: 20px; }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Tetris Bot</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="game-wrap">
+    <canvas id="board" width="300" height="600"></canvas>
+    <aside class="panel">
+      <h1>Tetris Bot</h1>
+      <div class="stat"><span>Score</span><b id="score">0</b></div>
+      <div class="stat"><span>Lines</span><b id="lines">0</b></div>
+      <div class="stat"><span>Level</span><b id="level">1</b></div>
+      <div class="next-box">
+        <span>Next</span>
+        <canvas id="next" width="120" height="120"></canvas>
+      </div>
+      <div class="buttons">
+        <button id="pauseBtn">Pause</button>
+        <button id="restartBtn">Restart</button>
+      </div>
+    </aside>
+  </div>
+  <div id="overlay" class="overlay hidden">
+    <div class="overlay-content">
+      <h2>Game Over</h2>
+      <p>Final Score: <b id="finalScore">0</b></p>
+      <button id="overlayRestart">Play Again</button>
+    </div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
